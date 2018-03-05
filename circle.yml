@@ -1,11 +1,34 @@
-dependencies:
-  pre:
-    - pip install -r requirements-ci.txt
+machine:
+  services:
+    - docker
 
-test:
+dependencies:
   override:
-    - coverage run --include=test.py,registry.py test.py
-  post:
-    - mkdir -p $CIRCLE_ARTIFACTS/coverage
-    - coverage html -d $CIRCLE_ARTIFACTS/coverage
-    - mv .coverage $CIRCLE_ARTIFACTS
+    - docker build -t bigboat/registry-cli .
+
+deployment:
+  master:
+    branch: master
+    commands:
+      - docker tag bigboat/registry-cli bigboat/registry-cli:development
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - docker push bigboat/registry-cli:development
+
+  tags:
+    tag: /^[0-9]+\.[0-9]+\.[0-9]+$/
+    commands:
+      - docker tag bigboat/registry-cli bigboat/registry-cli:${CIRCLE_TAG}
+      - MAJOR_VERSION=${CIRCLE_TAG/.*}; docker tag bigboat/registry-cli:${CIRCLE_TAG} bigboato/registry-cli:${MAJOR_VERSION}
+      - MINOR_VERSION=${CIRCLE_TAG%.*}; docker tag bigboat/registry-cli:${CIRCLE_TAG} bigboat/registry-cli:${MINOR_VERSION}
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - docker push bigboat/registry-cli
+      - docker push bigboat/registry-cli:${CIRCLE_TAG}
+      - docker push bigboat/registry-cli:${MINOR_VERSION}
+      - docker push bigboat/registry-cli:${MAJOR_VERSION}
+
+  features:
+    branch: /^feature.*$/
+    commands:
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - docker tag bigboat/registry-cli:latest bigboat/registry-cli:${CIRCLE_BRANCH}
+      - docker push bigboat/registry-cli:${CIRCLE_BRANCH}
