@@ -546,10 +546,20 @@ def get_tags(all_tags_list, image_name, tags_like):
 
 
 def delete_tags_by_age(registry, image_name, dry_run, hours, tags_to_keep):
-    image_tags = registry.list_tags(image_name)
+    tags_list = registry.list_tags(image_name)
     tags_to_delete = []
+    keep_tags = []
+    keep_tags.extend(tags_to_keep)
     print('---------------------------------')
-    for tag in image_tags:
+    tags_list_to_delete = sorted(tags_list, key=natural_keys)[:-10]
+    # A manifest might be shared between different tags. Explicitly add those
+    # tags that we want to preserve to the keep_tags list, to prevent
+    # any manifest they are using from being deleted.
+    tags_list_to_keep = [
+        tag for tag in tags_list if tag not in tags_list_to_delete]
+    keep_tags.extend(tags_list_to_keep)
+
+    for tag in tags_list_to_delete:
         image_config = registry.get_tag_config(image_name, tag)
 
         if image_config == []:
@@ -568,7 +578,7 @@ def delete_tags_by_age(registry, image_name, dry_run, hours, tags_to_keep):
             tags_to_delete.append(tag)
 
     print('------------deleting-------------')
-    delete_tags(registry, image_name, dry_run, tags_to_delete, tags_to_keep)
+    delete_tags(registry, image_name, dry_run, tags_to_delete, keep_tags)
 
 
 def main_loop(args):
